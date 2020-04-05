@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+
+	<flow name="cf-job-status-check" doc:id="7c3255cb-49a8-44d0-99f8-04a9552071db" >
+		<scripting:execute engine="groovy" doc:name="Execute delay" doc:id="9985f2b6-f3c0-464a-bceb-1625f2150ca8" target="delay">
+			<scripting:code >sleep(1000)</scripting:code>
+		</scripting:execute>
+		<set-variable value="#[payload]" doc:name="Set incoming request" doc:id="4f87ac96-b751-44ac-aa7c-f4f141bd13ca" variableName="incomingRequest"/>
+		<scripting:execute engine="groovy" doc:name="Execute delay" doc:id="cb303e43-7610-45e7-a129-16c22df7803e" target="delay">
+			<scripting:code >sleep(2000)</scripting:code>
+		</scripting:execute>
+		<salesforce:job-info doc:name="Get Intial Job status information" doc:id="1c235844-843f-4f96-8805-693c849e5751" jobId="#[vars.upsertData.jobId]" config-ref="Salesforce_Config"/>
+		<logger level="INFO" doc:name="Logger" doc:id="bc348552-f2de-46ce-b5ef-e5309bed1d38" message="#[output application/json --- payload]" />
+		<choice doc:name="Check for the complete processing of the bulk upsert" doc:id="faae5eda-9e90-41a5-847e-ec4d435c928e" >
+			<when expression="#[(payload.numberBatchesCompleted == payload.numberBatchesTotal) and (payload.numberBatchesFailed == 0)]">
+				<flow-ref doc:name="Refer to cf-create-output-from-batch" doc:id="f04addcb-a37c-4633-91f2-770a221ee271" name="cf-create-output-from-batch" />
+			</when>
+			<otherwise >
+				<scripting:execute engine="groovy" doc:name="Intiate 1 second delay below SF call" doc:id="fa941ccb-0841-4f38-9cd3-34cabe65e3de">
+			<scripting:code>sleep(1000);
+ return message.payload;</scripting:code>
+			
+		
+</scripting:execute>
+				<salesforce:job-info doc:name="Get Job status information" doc:id="47b11432-4aa2-4312-bf88-35ccd7801710" config-ref="Salesforce_Config" jobId="#[vars.upsertData.jobId]" />
+				<logger level="INFO" doc:name="Logger" doc:id="943e1b66-d7d1-4475-af7d-19607b58095d" message="#[output application/json --- payload]"/>
+				<flow-ref doc:name="Refer to cf-job-status-check" doc:id="b939851c-59a1-46f2-b608-0906eede31f9" name="cf-job-status-check" />
+			
+</otherwise>
+		</choice>
+	</flow>
+	
+	<sub-flow name="cf-create-output-from-batch" doc:id="60df66ac-b65a-4667-854c-37d88e8735bb" >
+		<salesforce:batch-result-stream doc:name="Check bulk upsert (batch) result" doc:id="4df7d9af-8e51-45fe-b298-a091a3b28a1f" config-ref="Salesforce_Config" targetValue="#[output application/json --- payload]">
+			<salesforce:batch-to-retrieve ><![CDATA[#[vars.upsertData]]]></salesforce:batch-to-retrieve>
+		</salesforce:batch-result-stream>
+		<set-variable value="#[payload]" doc:name="Initiate failedRecords" doc:id="4a384660-0d36-4181-92f0-3b26f233cbcc" variableName="failedRecords"/>
+		<flow-ref doc:name="Refer to cf-generate-ouput-result" doc:id="b63ce2d0-7020-4461-9ed9-9da1dea104f8" name="cf-generate-ouput-result" />
+		<logger level="INFO" doc:name="LOG INFO process completion time" doc:id="28a81c69-ef99-4b9b-8b94-3fa2105a3e68" message="#[%dw 2.0
+output application/json
+---
+{ &quot;process completion time&quot;: (now() - vars.startTime) replace 'PT' with ''}]" />
+	
+
+</sub-flow>
+	<sub-flow name="cf-generate-ouput-result" doc:id="ce90287a-39b5-4650-aa92-d4aa78b06b9e" >
+		<ee:transform doc:name="DW Generate error record indexes" doc:id="611bfe98-32ab-46f1-8fda-6292c404554c">
+			<ee:message>
+				<ee:set-payload resource="dwScripts/recordIndexes.dwl" />
+			
+</ee:message>
+			<ee:variables >
+				<ee:set-variable resource="dwScripts/acc.dwl" variableName="acc" />
+			
+</ee:variables>
+		
+</ee:transform>
+		<choice doc:name="Choice" doc:id="ce83ca29-1272-46f9-aa60-a39f2248dcb0" >
+			<when expression="#[payload.index != null]">
+				<foreach doc:name="For Each" doc:id="d612eb98-68eb-4158-a74f-f2e62e0b9cd4">
+             
+                 <ee:transform doc:name="DW Aggregate error  records" doc:id="1b2cef5c-d935-45c5-b888-bb61dd9f443e">
+				<ee:message>
+				</ee:message>
+				<ee:variables>
+							<ee:set-variable resource="dwScripts/aggregateRecords.dwl" variableName="acc" />
+				
+</ee:variables>
+			</ee:transform>
+            
+		
+</foreach>
+				<set-payload value="#[vars.acc]" doc:name="Set Payload" doc:id="3adf9f21-8608-4ca6-8012-7dd30058a418" />
+				<async doc:name="Async" doc:id="4e8d175b-1a2e-4b32-8aad-f35e8a7ffe7c">
+			<flow-ref doc:name="notification-flow" doc:id="40c4d41a-85fa-4c7f-8f5f-f24edfd922a2" name="notification-flow" />
+		</async>
+			
+
+</when>
+			<otherwise >
+				<ee:transform doc:name="DW Success Payload Response" doc:id="d1e27725-b984-4ffa-9540-8b7687f2cf5a" >
+					<ee:message >
+						<ee:set-payload resource="dwScripts/successResponse.dwl" />
+
+					
+</ee:message>
+					<ee:variables >
+					</ee:variables>
+				</ee:transform>
+			
+</otherwise>
+		</choice>
+	
+</sub-flow>	
+	
+</mule>

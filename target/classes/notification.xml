@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns:email="http://www.mulesoft.org/schema/mule/email" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/email http://www.mulesoft.org/schema/mule/email/current/mule-email.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<sub-flow name="notification-flow" doc:id="5f381c41-fb91-40e8-814f-a934e8b4ac00" >
+		<try doc:name="Try" doc:id="762b2a72-dbb2-4c8c-85e7-1ff4f63d52da" >
+		
+		<os:retrieve doc:name="Retrieve Operation" doc:id="882cf456-c273-4569-a726-6a8aeae67542" key="operation" target="operation">
+				<os:default-value ><![CDATA[#[null]]]></os:default-value>
+			</os:retrieve>
+			<choice doc:name="Choice" doc:id="43a7aab9-58c3-4ca6-aae8-88f204782e51" >
+			<when expression="#[((p('smtp.switch') == &quot;true&quot;) and (vars.operation != &quot;insert&quot;))]">
+				<!-- <email:send doc:name="Send notification" doc:id="e0b47668-c8b6-4ea9-aad4-f6d59cdebdd3" toAddresses="#[(p('smtp.to'))splitBy(',')]" config-ref="Email_SMTP" fromAddress="${smtp.from}" subject="#[p('smtp.subject')]">
+					<email:body contentType="text/html">
+						<email:content ><![CDATA[#["Please check attachment for error report"]]]></email:content>
+					</email:body>
+					<email:attachments ><![CDATA[#[{"Error log" : payload}]]]></email:attachments>
+				</email:send> -->
+				<logger level="INFO" doc:name="LOG INFO" doc:id="4634e792-059b-4049-8c9e-dc498f1861a5" message="Notification is sent !"/>
+					<async doc:name="Async" doc:id="fcb2ead1-d9c4-44db-bb91-1d88e1eea376" >
+						<ee:transform doc:name="DW SET ERROR payload" doc:id="eebb1623-1af4-4799-9a69-d0e8b01b4326" >
+							<ee:message >
+								<ee:set-payload resource="dwScripts/errorPayload.dwl" />
+							</ee:message>
+						</ee:transform>
+						<http:request method="POST" doc:name="HTTP POST error log" doc:id="0da06e1e-de93-492c-9f28-7e2d05f55241" config-ref="HTTP_Error_log_configuration" path="/system/api/error/log">
+						</http:request>
+					</async>
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="LOG INFO" doc:id="62de8f83-586f-4cb8-995e-c57ba516801e" message="Error log is disabled !"/>
+			</otherwise>
+		</choice>
+			<error-handler >
+				<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="2128ae9f-7c72-412f-bcf4-3112bf090316" type="ANY">
+					<logger level="INFO" doc:name="LOG INFO" doc:id="2ccb25a4-ad9e-416d-831e-cb8061157c83" message="Error in sending notification !"/>
+				</on-error-continue>
+			</error-handler>
+		
+</try>
+	</sub-flow>
+</mule>

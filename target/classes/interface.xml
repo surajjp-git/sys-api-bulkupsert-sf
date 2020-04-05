@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd">
+	
+	<flow name="sys-api-nav-to-sfFlow" doc:id="fe9c16b6-ef44-48a6-84f9-b43755d7511a" >
+		<http:listener doc:name="Listener" doc:id="6ff91973-a49c-4d51-b5f8-ce627fe87fee" config-ref="HTTP_Listener_config" path="/cura/sf"/>
+		<set-variable value="#[attributes.headers.objectName]" doc:name="Set objectName" doc:id="710df4ff-e01e-43d8-9221-17c9ce7d91b5" variableName="objectName" mimeType="text/plain"/>
+		<set-variable value='#[attributes.headers.NAV_CompanyName default ""]' doc:name="Set NAV_CompanyName" doc:id="fa15ff8d-ab7a-4660-a57b-566768ca11bf" variableName="NAV_CompanyName" mimeType="text/plain"/>
+		<choice doc:name="Choice" doc:id="90735ba2-7b70-4f4b-a66f-de8ac83cb4bd" >
+			<when expression='#[attributes.headers.operation == "insert"]'>
+				<salesforce:create-bulk doc:name="Create bulk" doc:id="a24a6cdb-0ae8-4d7d-83a6-ddd8bba3e597" config-ref="Salesforce_Config" type="#[attributes.headers.objectName]" target="upsertData"/>
+				<os:store doc:name="Store operation" doc:id="a9a9c66d-801e-4e00-bced-71ef31e61f07" key="operation">
+					<os:value ><![CDATA[#["insert"]]]></os:value>
+				</os:store>
+			</when>
+			<otherwise >
+				<salesforce:upsert-bulk type="#[attributes.headers.objectName]" doc:name="Upsert bulk" doc:id="9593182b-6eab-4f0b-b2d4-e6758df9ca69" config-ref="Salesforce_Config" target="upsertData" externalIdFieldName="#[attributes.headers.externalId]" />
+				<os:store doc:name="Store operation" doc:id="892cfde3-5b48-4cbd-a2b7-c2fedf52f8fe" key="operation">
+					<os:value ><![CDATA[#["upsert"]]]></os:value>
+				</os:store>
+			</otherwise>
+		</choice>
+		<set-variable value="#[now()]" doc:name="Set start time" doc:id="0741be68-7814-41a6-8089-345c80ff9347" variableName="startTime"/>
+		<flow-ref doc:name="cf-job-status-check" doc:id="2ce311cd-70f8-48ae-84e5-d02da446a6dd" name="cf-job-status-check"/>
+	</flow>
+</mule>

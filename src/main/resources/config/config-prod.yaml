@@ -1,0 +1,14 @@
+http:
+ port: "8081"
+
+sf:
+ username: ""
+ password: ""
+ token: ""
+ url: "https://login.salesforce.com/services/Soap/u/46.0"
+ 
+error.log:
+  host: "prod-sys-api-sf-error-log.us-e2.cloudhub.io"
+  
+smtp:
+  switch: "true"

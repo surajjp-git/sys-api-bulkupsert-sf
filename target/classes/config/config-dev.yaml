@@ -1,0 +1,14 @@
+http:
+ port: "8081"
+
+sf:
+ username: "crm@curacan.com.test"
+ password: "CuraSF#!9"
+ token: "l4ASkWSyHPaAt6b5JIrt2KBUA"
+ url: "https://test.salesforce.com/services/Soap/u/46.0"
+ 
+error.log:
+  host: "sys-api-sf-error-log.us-e2.cloudhub.io"
+  
+smtp:
+  switch: "true"
